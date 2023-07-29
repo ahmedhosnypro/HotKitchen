@@ -1,0 +1,197 @@
+type: edu
+files:
+- name: test/HotKitchenTest.kt
+  visible: false
+  text: |-
+    import com.typesafe.config.ConfigFactory
+    import io.ktor.config.*
+    import io.ktor.http.*
+    import io.ktor.server.testing.*
+    import org.hyperskill.hstest.dynamic.DynamicTest
+    import org.hyperskill.hstest.stage.StageTest
+    import org.hyperskill.hstest.testcase.CheckResult
+
+    class HotKitchenTest : StageTest<Any>() {
+
+        private val email = System.currentTimeMillis().toString() + "jmail.com"
+        private val password = (System.currentTimeMillis() % 100_000_000).toString()
+
+        private val signedIn = """{"status":"Signed In"}"""
+        private val signedUp = """{"status":"Signed Up"}"""
+        private val registrationFailed = """{"status":"Registration failed"}"""
+        private val authorizationFailed = """{"status":"Authorization failed"}"""
+        private val currentCredentials = """{"email":"$email","userType":"testUser","password":"correct$password"}"""
+        private val currentWrongSignIn = """{"email":"$email","password":"wrong$password"}"""
+        private val currentCorrectSignIn = """{"email":"$email","password":"correct$password"}"""
+
+
+        @DynamicTest(order = 1)
+        fun registerNewUser(): CheckResult {
+            try {
+                withApplication(
+                    createTestEnvironment { config = HoconApplicationConfig(ConfigFactory.load("application.conf")) })
+                {
+                    with(handleRequest(HttpMethod.Post, "/signup") {
+                        setBody(currentCredentials)
+                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    }) {
+                        if (response.content != signedUp || response.status() != HttpStatusCode.OK)
+                            return@withApplication CheckResult.wrong(
+                                "Cannot register a new user. Wrong response message or status code."
+                            )
+                    }
+                }
+            } catch (e: Exception) {
+                return CheckResult.wrong(e.message)
+            }
+            return CheckResult.correct()
+        }
+
+
+        @DynamicTest(order = 2)
+        fun registerExistingUser(): CheckResult {
+            try {
+                withApplication(
+                    createTestEnvironment { config = HoconApplicationConfig(ConfigFactory.load("application.conf")) })
+                {
+                    with(handleRequest(HttpMethod.Post, "/signup") {
+                        setBody(currentCredentials)
+                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    }) {
+                        if (response.content != registrationFailed || response.status() != HttpStatusCode.Forbidden)
+                            return@withApplication CheckResult.wrong(
+                                "An existing user is registered. Wrong response message or status code."
+                            )
+                    }
+                }
+            } catch (e: Exception) {
+                return CheckResult.wrong(e.message)
+            }
+            return CheckResult.correct()
+        }
+
+        @DynamicTest(order = 3)
+        fun wrongAuthorization(): CheckResult {
+            try {
+                withApplication(
+                    createTestEnvironment { config = HoconApplicationConfig(ConfigFactory.load("application.conf")) })
+                {
+                    with(handleRequest(HttpMethod.Post, "/signin") {
+                        setBody(currentWrongSignIn)
+                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    }) {
+                        if (response.content != authorizationFailed || response.status() != HttpStatusCode.Forbidden)
+                            return@withApplication CheckResult.wrong(
+                                "Error when authorizing a user using a wrong password. Wrong response message or status code."
+                            )
+                    }
+                }
+            } catch (e: Exception) {
+                return CheckResult.wrong(e.message)
+            }
+            return CheckResult.correct()
+        }
+
+        @DynamicTest(order = 4)
+        fun correctAuthorization(): CheckResult {
+            try {
+                withApplication(
+                    createTestEnvironment { config = HoconApplicationConfig(ConfigFactory.load("application.conf")) })
+                {
+                    with(handleRequest(HttpMethod.Post, "/signin") {
+                        setBody(currentCorrectSignIn)
+                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    }) {
+                        if (response.content != signedIn || response.status() != HttpStatusCode.OK)
+                            return@withApplication CheckResult.wrong(
+                            "Error when authorizing a user using a correct password. Wrong response message or status code."
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                return CheckResult.wrong(e.message)
+            }
+            return CheckResult.correct()
+        }
+    }
+  learner_created: false
+- name: src/entity/User.kt
+  visible: true
+  learner_created: true
+- name: build.gradle
+  visible: true
+  text: |-
+    buildscript {
+        repositories {
+            mavenCentral()
+        }
+        dependencies {
+            classpath "org.jetbrains.kotlin:kotlin-serialization:1.6.21"
+        }
+    }
+    def ktor_version = "1.6.7"
+
+    apply plugin: 'java'
+    apply plugin: 'org.jetbrains.kotlin.jvm'
+    apply plugin: 'kotlin'
+    apply plugin: 'kotlinx-serialization'
+
+    repositories {
+        mavenCentral()
+    }
+
+
+    sourceSets.main.resources.srcDirs = ["src/resources"]
+
+    dependencies {
+        implementation "org.jetbrains.kotlin:kotlin-stdlib"
+        implementation "io.ktor:ktor-server-core:$ktor_version"
+        implementation "io.ktor:ktor-server-netty:$ktor_version"
+        implementation("ch.qos.logback:logback-classic:1.2.10")
+
+        implementation "io.ktor:ktor-auth:$ktor_version"
+        implementation "io.ktor:ktor-auth-jwt:$ktor_version"
+
+        implementation "io.ktor:ktor-serialization:$ktor_version"
+        implementation('org.jetbrains.exposed:exposed-core:0.37.3')
+        implementation('org.jetbrains.exposed:exposed-dao:0.37.3')
+        implementation('org.jetbrains.exposed:exposed-jdbc:0.37.3')
+        implementation('com.zaxxer:HikariCP:5.0.1')
+        implementation("org.postgresql:postgresql:42.3.2")
+    }
+  learner_created: false
+- name: src/resources/HotKitchen.http
+  visible: true
+  learner_created: true
+- name: src/Application.kt
+  visible: true
+  text: |-
+    package hotkitchen
+
+    import io.ktor.application.*
+
+    fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
+
+    fun Application.module(testing: Boolean = false) {}
+  learner_created: false
+- name: src/resources/application.conf
+  visible: true
+  text: |-
+    ktor {
+        deployment {
+            port = 28888
+        }
+        application {
+            modules = [hotkitchen.ApplicationKt.module]
+        }
+    }
+  learner_created: false
+- name: src/route/UserRouting.kt
+  visible: true
+  learner_created: true
+feedback_link: https://hyperskill.org/learn/step/22603#comment
+status: Solved
+feedback:
+  message: Congratulations!
+  time: "Sat, 29 Jul 2023 11:19:24 UTC"
+record: -1

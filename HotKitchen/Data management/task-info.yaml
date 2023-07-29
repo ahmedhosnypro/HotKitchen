@@ -1,0 +1,457 @@
+type: edu
+files:
+- name: src/resources/application.conf
+  visible: true
+  text: |-
+    ktor {
+        deployment {
+            port = 28888
+        }
+        application {
+            modules = [hotkitchen.ApplicationKt.module]
+        }
+    }
+  learner_created: false
+- name: src/Application.kt
+  visible: true
+  text: |-
+    package hotkitchen
+
+    import io.ktor.application.*
+
+    fun main(args: Array<String>): Unit = io.ktor.server.netty.EngineMain.main(args)
+
+    fun Application.module(testing: Boolean = false) {}
+  learner_created: false
+- name: build.gradle
+  visible: true
+  text: |-
+    buildscript {
+        repositories {
+            mavenCentral()
+        }
+        dependencies {
+            classpath "org.jetbrains.kotlin:kotlin-serialization:1.6.21"
+        }
+    }
+    def ktor_version = "1.6.7"
+
+    apply plugin: 'java'
+    apply plugin: 'org.jetbrains.kotlin.jvm'
+    apply plugin: 'kotlin'
+    apply plugin: 'kotlinx-serialization'
+
+    repositories {
+        mavenCentral()
+    }
+
+
+    sourceSets.main.resources.srcDirs = ["src/resources"]
+
+    dependencies {
+        implementation "org.jetbrains.kotlin:kotlin-stdlib"
+        implementation "io.ktor:ktor-server-core:$ktor_version"
+        implementation "io.ktor:ktor-server-netty:$ktor_version"
+        implementation("ch.qos.logback:logback-classic:1.2.10")
+
+        implementation "io.ktor:ktor-auth:$ktor_version"
+        implementation "io.ktor:ktor-auth-jwt:$ktor_version"
+
+        implementation "io.ktor:ktor-serialization:$ktor_version"
+        implementation('org.jetbrains.exposed:exposed-core:0.37.3')
+        implementation('org.jetbrains.exposed:exposed-dao:0.37.3')
+        implementation('org.jetbrains.exposed:exposed-jdbc:0.37.3')
+        implementation('com.zaxxer:HikariCP:5.0.1')
+        implementation("org.postgresql:postgresql:42.3.2")
+    }
+  learner_created: false
+- name: test/testdata/Credentials.kt
+  visible: false
+  text: |
+    package testdata
+
+    import kotlinx.serialization.Serializable
+
+    @Serializable
+    data class Credentials(var email: String, var userType: String, var password: String)
+  learner_created: false
+- name: test/testdata/Meal.kt
+  visible: false
+  text: |-
+    package testdata
+
+    import kotlinx.serialization.Serializable
+
+    @Serializable
+    data class Meal(
+        val mealId: Int,
+        val title: String,
+        val price: Float,
+        val imageUrl: String,
+        val categoryIds: List<Int>
+    )
+  learner_created: false
+- name: test/testdata/Order.kt
+  visible: false
+  text: |-
+    package testdata
+
+    import kotlinx.serialization.Serializable
+
+    @Serializable
+    data class Order(
+        var orderId: Int,
+        val userEmail: String,
+        val mealsIds: List<Int>,
+        val price: Float,
+        val address: String,
+        val status: String
+    )
+  learner_created: false
+- name: test/testdata/Token.kt
+  visible: false
+  text: |-
+    package testdata
+    import kotlinx.serialization.Serializable
+
+    @Serializable
+    data class Token(val token: String)
+  learner_created: false
+- name: test/testdata/User.kt
+  visible: false
+  text: |-
+    package testdata
+
+    import kotlinx.serialization.Serializable
+
+    @Serializable
+    data class User(
+        val name: String, val userType: String, val phone: String, val email: String, val address: String
+    )
+  learner_created: false
+- name: test/HotKitchenTest.kt
+  visible: false
+  text: |-
+    import com.typesafe.config.ConfigFactory
+    import io.ktor.config.*
+    import io.ktor.http.*
+    import io.ktor.server.testing.*
+    import kotlinx.serialization.decodeFromString
+    import kotlinx.serialization.encodeToString
+    import kotlinx.serialization.json.Json
+    import org.hyperskill.hstest.dynamic.DynamicTest
+    import org.hyperskill.hstest.stage.StageTest
+    import org.hyperskill.hstest.testcase.CheckResult
+    import testdata.*
+
+    class HotKitchenTest : StageTest<Any>() {
+
+        private val time = System.currentTimeMillis()
+        private val jwtRegex = """^[a-zA-Z0-9]+?\.[a-zA-Z0-9]+?\..+""".toRegex()
+        private val currentCredentialsClient = Credentials("$time@client.com", "client", "password$time")
+        private var currentUserClient = User(
+            time.toString() + "name",
+            "client",
+            "+79999999999",
+            currentCredentialsClient.email,
+            time.toString() + "address"
+        )
+        private val currentCredentialsStaff = Credentials("$time@staff.com", "staff", "password$time")
+        private val currentMeals = arrayOf(
+            Meal(
+                time.toInt(),
+                "$time title1",
+                (time.toInt() % 100).toFloat(),
+                "image $time url",
+                listOf((0..10).random(), (0..10).random(), (0..10).random())
+            ),
+            Meal(
+                time.toInt() + 1,
+                "$time title1",
+                (time.toInt() % 100).toFloat(),
+                "image $time url",
+                listOf((0..10).random(), (0..10).random(), (0..10).random())
+            ),
+            Meal(
+                time.toInt() + 2,
+                "$time title1",
+                (time.toInt() % 100).toFloat(),
+                "image $time url",
+                listOf((0..10).random(), (0..10).random(), (0..10).random())
+            )
+        )
+        private val accessDenied = """{"status":"Access denied"}"""
+
+        private val price = currentMeals[0].price + currentMeals[1].price + currentMeals[2].price
+        private val mealsIds = listOf(currentMeals[0].mealId, currentMeals[1].mealId, currentMeals[2].mealId)
+        private val currentOrder =
+            Order(time.toInt(), currentCredentialsClient.email, mealsIds, price, currentUserClient.address, "COOK")
+
+        private lateinit var signInTokenClient: String
+        private lateinit var signInTokenStaff: String
+
+        private var incompleteSize = 0
+
+
+        @DynamicTest(order = 1)
+        fun getSignInJWTToken(): CheckResult {
+            try {
+                withApplication(createTestEnvironment {
+                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
+                }) {
+                    with(handleRequest(HttpMethod.Post, "/signup") {
+                        setBody(Json.encodeToString(currentCredentialsClient))
+                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    }) {
+                        try {
+                            val principal = Json.decodeFromString<Token>(response.content ?: "")
+                            signInTokenClient = principal.token
+                            if (!signInTokenClient.matches(jwtRegex) || signInTokenClient.contains(currentCredentialsClient.email))
+                                return@withApplication CheckResult.wrong("Invalid JWT token")
+                        } catch (e: Exception) {
+                            return@withApplication CheckResult.wrong("Cannot get token form /signin request")
+                        }
+                    }
+                    with(handleRequest(HttpMethod.Post, "/signup") {
+                        setBody(Json.encodeToString(currentCredentialsStaff))
+                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    }) {
+                        try {
+                            val principal = Json.decodeFromString<Token>(response.content ?: "")
+                            signInTokenStaff = principal.token
+                            if (!signInTokenStaff.matches(jwtRegex) || signInTokenStaff.contains(currentCredentialsStaff.email))
+                                return@withApplication CheckResult.wrong("Invalid JWT token")
+                        } catch (e: Exception) {
+                            return@withApplication CheckResult.wrong("Cannot get token form /signin request")
+                        }
+                    }
+                    return@withApplication CheckResult.correct()
+                }
+            } catch (e: Exception) {
+                return CheckResult.wrong(e.message)
+            }
+            return CheckResult.correct()
+        }
+
+        @DynamicTest(order = 2)
+        fun correctValidation(): CheckResult {
+            try {
+                withApplication(createTestEnvironment {
+                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
+                }) {
+                    with(handleRequest(HttpMethod.Get, "/validate") {
+                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenClient")
+                    }) {
+                        if (response.status() != HttpStatusCode.OK || response.content != "Hello, ${currentCredentialsClient.userType} ${currentCredentialsClient.email}") return@withApplication CheckResult.wrong(
+                            "testdata.Token validation with signin token failed.\nStatus code should be \"200 OK\"\nMessage should be \"Hello, ${currentCredentialsClient.userType} ${currentCredentialsClient.email}\""
+                        )
+                    }
+                    with(handleRequest(HttpMethod.Get, "/validate") {
+                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenStaff")
+                    }) {
+                        if (response.status() != HttpStatusCode.OK || response.content != "Hello, ${currentCredentialsStaff.userType} ${currentCredentialsStaff.email}") return@withApplication CheckResult.wrong(
+                            "testdata.Token validation with signin token failed.\nStatus code should be \"200 OK\"\nMessage should be \"Hello, ${currentCredentialsStaff.userType} ${currentCredentialsStaff.email}\""
+                        )
+                    }
+                    return@withApplication CheckResult.correct()
+                }
+            } catch (e: Exception) {
+                return CheckResult.wrong(e.message)
+            }
+            return CheckResult.correct()
+        }
+
+        @DynamicTest(order = 3)
+        fun createUser(): CheckResult {
+            try {
+                withApplication(createTestEnvironment {
+                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
+                }) {
+                    with(handleRequest(HttpMethod.Put, "/me") {
+                        setBody(Json.encodeToString(currentUserClient))
+                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenClient")
+                    }) {
+                        if (response.status() != HttpStatusCode.OK)
+                            return@withApplication CheckResult.wrong("Cannot add user by put method")
+                    }
+                    return@withApplication CheckResult.correct()
+                }
+            } catch (e: Exception) {
+                return CheckResult.wrong(e.message)
+            }
+            return CheckResult.correct()
+        }
+
+        @DynamicTest(order = 4)
+        fun successAdditionMeal(): CheckResult {
+            try {
+                withApplication(createTestEnvironment {
+                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
+                }) {
+                    for (meal in currentMeals)
+                        with(handleRequest(HttpMethod.Post, "/meals") {
+                            setBody(Json.encodeToString(meal))
+                            addHeader(HttpHeaders.Authorization, "Bearer $signInTokenStaff")
+                            addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                        }) {
+                            if (response.status() != HttpStatusCode.OK)
+                                return@withApplication CheckResult.wrong("The meal was not added. Wrong status code.")
+                        }
+                    return@withApplication CheckResult.correct()
+                }
+            } catch (e: Exception) {
+                return CheckResult.wrong(e.message)
+            }
+            return CheckResult.correct()
+        }
+
+        @DynamicTest(order = 5)
+        fun invalidOrderCreation(): CheckResult {
+            try {
+                withApplication(createTestEnvironment {
+                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
+                }) {
+                    with(handleRequest(HttpMethod.Post, "/order") {
+                        setBody(Json.encodeToString(listOf(1, 2, (-9999999..-9999).random())))
+                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenClient")
+                    }) {
+                        if (response.status() != HttpStatusCode.BadRequest)
+                            return@withApplication CheckResult.wrong("Created an order with the wrong meal id. Wrong status code.")
+                    }
+                    return@withApplication CheckResult.correct()
+                }
+            } catch (e: Exception) {
+                return CheckResult.wrong(e.message)
+            }
+            return CheckResult.correct()
+        }
+
+        @DynamicTest(order = 6)
+        fun validOrderCreation(): CheckResult {
+            try {
+                withApplication(createTestEnvironment {
+                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
+                }) {
+                    with(handleRequest(HttpMethod.Post, "/order") {
+                        setBody(Json.encodeToString(mealsIds))
+                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenClient")
+                    }) {
+                        if (response.status() != HttpStatusCode.OK)
+                            return@withApplication CheckResult.wrong("Unable to create order. Wrong status code.")
+                        val order = Json.decodeFromString<Order>(response.content ?: "")
+                        if (order.userEmail != currentOrder.userEmail || order.price != currentOrder.price || order.address != currentOrder.address || order.status != currentOrder.status)
+                            return@withApplication CheckResult.wrong("Wrong order.")
+                        else currentOrder.orderId = order.orderId
+                    }
+                    return@withApplication CheckResult.correct()
+                }
+            } catch (e: Exception) {
+                return CheckResult.wrong(e.message)
+            }
+            return CheckResult.correct()
+        }
+
+        @DynamicTest(order = 7)
+        fun invalidMarkAsReady(): CheckResult {
+            try {
+                withApplication(createTestEnvironment {
+                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
+                }) {
+                    with(handleRequest(HttpMethod.Post, "/order/${currentOrder.orderId}/markReady") {
+                        setBody(Json.encodeToString(mealsIds))
+                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenClient")
+                    }) {
+                        if (response.status() != HttpStatusCode.Forbidden || response.content != accessDenied)
+                            return@withApplication CheckResult.wrong("Only staff can mark order as COMPLETE. Wrong status code.")
+                    }
+                    return@withApplication CheckResult.correct()
+                }
+            } catch (e: Exception) {
+                return CheckResult.wrong(e.message)
+            }
+            return CheckResult.correct()
+        }
+
+        @DynamicTest(order = 8)
+        fun validMarkAsReady(): CheckResult {
+            try {
+                withApplication(createTestEnvironment {
+                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
+                }) {
+                    with(handleRequest(HttpMethod.Post, "/order/${currentOrder.orderId}/markReady") {
+                        setBody(Json.encodeToString(mealsIds))
+                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenStaff")
+                    }) {
+                        if (response.status() != HttpStatusCode.OK)
+                            return@withApplication CheckResult.wrong("Unable to mark order as COMPLETE. Wrong status code.")
+                    }
+                    return@withApplication CheckResult.correct()
+                }
+            } catch (e: Exception) {
+                return CheckResult.wrong(e.message)
+            }
+            return CheckResult.correct()
+        }
+
+        @DynamicTest(order = 9)
+        fun getOrders(): CheckResult {
+            try {
+                withApplication(createTestEnvironment {
+                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
+                }) {
+                    with(handleRequest(HttpMethod.Get, "/orderHistory") {
+                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenClient")
+                    }) {
+                        val orders: List<Order> = Json.decodeFromString(response.content ?: "")
+                        var flag = true
+                        for (order in orders) {
+                            if (order.status == "COOK") incompleteSize++
+                            if (order.orderId == currentOrder.orderId) flag = false
+                        }
+                        if (flag)
+                            return@withApplication CheckResult.wrong("Wrong orders list. The newly added order is missing.")
+                        if (response.status() != HttpStatusCode.OK)
+                            return@withApplication CheckResult.wrong("Wrong status code in /orderHistory")
+                    }
+                    return@withApplication CheckResult.correct()
+                }
+            } catch (e: Exception) {
+                return CheckResult.wrong(e.message)
+            }
+            return CheckResult.correct()
+        }
+
+        @DynamicTest(order = 10)
+        fun getIncompleteOrders(): CheckResult {
+            try {
+                withApplication(createTestEnvironment {
+                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
+                }) {
+                    with(handleRequest(HttpMethod.Get, "/orderIncomplete") {
+                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenClient")
+                    }) {
+                        val orders: List<Order> = Json.decodeFromString(response.content ?: "")
+                        for (order in orders)
+                            if (order.status != "COOK") return@withApplication CheckResult.wrong("One of the orders is COMPLETE.")
+                        if (orders.size != incompleteSize) return@withApplication CheckResult.wrong("Invalid size of Incomplete orders.")
+                        if (response.status() != HttpStatusCode.OK)
+                            return@withApplication CheckResult.wrong("Wrong status code in /orderHistory")
+                    }
+                    return@withApplication CheckResult.correct()
+                }
+            } catch (e: Exception) {
+                return CheckResult.wrong(e.message)
+            }
+            return CheckResult.correct()
+        }
+
+    }
+  learner_created: false
+feedback_link: https://hyperskill.org/learn/step/22607#comment
+status: Unchecked
+record: -1

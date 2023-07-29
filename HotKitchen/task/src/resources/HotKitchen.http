@@ -1,0 +1,17 @@
+POST localhost:28888/signup
+Content-Type: application/json
+
+{
+  "email": "email@email.com",
+  "userType": "staff",
+  "password": "pass1"
+}
+###
+
+POST localhost:28888/signin
+Content-Type: application/json
+
+{
+  "email": "email@email.com",
+  "password": "pass1"
+}
