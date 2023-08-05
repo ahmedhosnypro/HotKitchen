@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="Gradle: io.ktor:ktor-server-auth-jwt-jvm:2.3.2" type="java-imported" external-system-id="GRADLE">
+    <properties groupId="io.ktor" artifactId="ktor-server-auth-jwt-jvm" version="2.3.2" />
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-server-auth-jwt-jvm/2.3.2/b331ad8b205a3e744b7918aee48cd62530bd241f/ktor-server-auth-jwt-jvm-2.3.2.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-server-auth-jwt-jvm/2.3.2/c9c536b402919914d213544ba897d19309455827/ktor-server-auth-jwt-jvm-2.3.2-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

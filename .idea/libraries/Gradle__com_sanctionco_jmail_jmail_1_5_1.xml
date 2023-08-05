@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="Gradle: com.sanctionco.jmail:jmail:1.5.1" type="java-imported" external-system-id="GRADLE">
+    <properties groupId="com.sanctionco.jmail" artifactId="jmail" version="1.5.1" />
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.sanctionco.jmail/jmail/1.5.1/816cd2ce4003b265226c2a9fc05ac3e683dc9c91/jmail-1.5.1.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.sanctionco.jmail/jmail/1.5.1/c2ed9ea0f60c4b770343c653e20fba35f5e97d74/jmail-1.5.1-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

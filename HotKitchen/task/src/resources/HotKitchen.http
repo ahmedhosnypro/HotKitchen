@@ -2,16 +2,31 @@ POST localhost:28888/signup
 Content-Type: application/json
 
 {
-  "email": "email@email.com",
-  "userType": "staff",
-  "password": "pass1"
+  "email": "1#690663216848@mail.com",
+  "userType": "client",
+  "password": "password1690663216848"
 }
-###
 
+###
+POST localhost:28888/signup
+Content-Type: application/json
+
+{
+  "email": "1691220352490@example.com (Duck Smith)",
+  "userType": "client",
+  "password": "password1690663216848"
+}
+
+###
 POST localhost:28888/signin
 Content-Type: application/json
 
 {
-  "email": "email@email.com",
-  "password": "pass1"
+  "email": "1690663216848@mail.com",
+  "password": "password1690663216848"
 }
+
+###
+GET localhost:28888/validate
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJodHRwOi8vbG9jYWxob3N0OjI4ODg4L3NpZ25pbiIsImlzcyI6Imh0dHA6Ly9sb2NhbGhvc3Q6Mjg4ODgvIiwidXNlcm5hbWUiOiIxNjkwNjYzMjE2ODQ4QG1haWwuY29tIiwiZXhwIjoxNjkxMjI3MjQ2fQ.lA6EkveDCFmgH3I_g2w76_cN9XGkQXcthB4erT5gn4s
+###

@@ -133,7 +133,9 @@ files:
   visible: false
   text: |-
     import com.typesafe.config.ConfigFactory
-    import io.ktor.config.*
+    import io.ktor.client.request.*
+    import io.ktor.client.statement.*
+    import io.ktor.server.config.*
     import io.ktor.http.*
     import io.ktor.server.testing.*
     import kotlinx.serialization.decodeFromString
@@ -195,259 +197,253 @@ files:
 
         @DynamicTest(order = 1)
         fun getSignInJWTToken(): CheckResult {
+            var result = CheckResult.correct()
             try {
-                withApplication(createTestEnvironment {
-                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
-                }) {
-                    with(handleRequest(HttpMethod.Post, "/signup") {
+                testApplication {
+                    var response = client.post("/signup") {
                         setBody(Json.encodeToString(currentCredentialsClient))
-                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                    }) {
-                        try {
-                            val principal = Json.decodeFromString<Token>(response.content ?: "")
-                            signInTokenClient = principal.token
-                            if (!signInTokenClient.matches(jwtRegex) || signInTokenClient.contains(currentCredentialsClient.email))
-                                return@withApplication CheckResult.wrong("Invalid JWT token")
-                        } catch (e: Exception) {
-                            return@withApplication CheckResult.wrong("Cannot get token form /signin request")
-                        }
+                        header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                     }
-                    with(handleRequest(HttpMethod.Post, "/signup") {
+                    try {
+                        val principal = Json.decodeFromString<Token>(response.bodyAsText() ?: "")
+                        signInTokenClient = principal.token
+                        if (!signInTokenClient.matches(jwtRegex) || signInTokenClient.contains(currentCredentialsClient.email))
+                            result = CheckResult.wrong("Invalid JWT token")
+                        return@testApplication
+                    } catch (e: Exception) {
+                        result = CheckResult.wrong("Cannot get token form /signup request")
+                    }
+
+                    response = client.post("/signin") {
                         setBody(Json.encodeToString(currentCredentialsStaff))
-                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                    }) {
-                        try {
-                            val principal = Json.decodeFromString<Token>(response.content ?: "")
-                            signInTokenStaff = principal.token
-                            if (!signInTokenStaff.matches(jwtRegex) || signInTokenStaff.contains(currentCredentialsStaff.email))
-                                return@withApplication CheckResult.wrong("Invalid JWT token")
-                        } catch (e: Exception) {
-                            return@withApplication CheckResult.wrong("Cannot get token form /signin request")
-                        }
+                        header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                     }
-                    return@withApplication CheckResult.correct()
+                    try {
+                        val principal = Json.decodeFromString<Token>(response.bodyAsText() ?: "")
+                        signInTokenStaff = principal.token
+                        if (!signInTokenStaff.matches(jwtRegex) || signInTokenStaff.contains(currentCredentialsStaff.email))
+                            result = CheckResult.wrong("Invalid JWT token")
+                        return@testApplication
+                    } catch (e: Exception) {
+                        result = CheckResult.wrong("Cannot get token form /signin request")
+                    }
                 }
             } catch (e: Exception) {
-                return CheckResult.wrong(e.message)
+                result = CheckResult.wrong(e.message)
             }
-            return CheckResult.correct()
+            return result
         }
 
         @DynamicTest(order = 2)
         fun correctValidation(): CheckResult {
+            var result = CheckResult.correct()
             try {
-                withApplication(createTestEnvironment {
-                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
-                }) {
-                    with(handleRequest(HttpMethod.Get, "/validate") {
-                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenClient")
-                    }) {
-                        if (response.status() != HttpStatusCode.OK || response.content != "Hello, ${currentCredentialsClient.userType} ${currentCredentialsClient.email}") return@withApplication CheckResult.wrong(
-                            "testdata.Token validation with signin token failed.\nStatus code should be \"200 OK\"\nMessage should be \"Hello, ${currentCredentialsClient.userType} ${currentCredentialsClient.email}\""
-                        )
+                testApplication {
+                    var response = client.get("/validate") {
+                        header(HttpHeaders.Authorization, "Bearer $signInTokenClient")
                     }
-                    with(handleRequest(HttpMethod.Get, "/validate") {
-                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenStaff")
-                    }) {
-                        if (response.status() != HttpStatusCode.OK || response.content != "Hello, ${currentCredentialsStaff.userType} ${currentCredentialsStaff.email}") return@withApplication CheckResult.wrong(
-                            "testdata.Token validation with signin token failed.\nStatus code should be \"200 OK\"\nMessage should be \"Hello, ${currentCredentialsStaff.userType} ${currentCredentialsStaff.email}\""
-                        )
+                    if (response.status != HttpStatusCode.OK
+                        || response.bodyAsText() != "Hello, ${currentCredentialsClient.userType} ${currentCredentialsClient.email}") {
+                        result = CheckResult.wrong(
+                            "testdata.Token validation with signin token failed.\nStatus code should be \"200 OK\"\n" +
+                                    "Message should be \"Hello, ${currentCredentialsClient.userType} ${currentCredentialsClient.email}\"")
+                        return@testApplication
                     }
-                    return@withApplication CheckResult.correct()
+                    response = client.get("/validate") {
+                        header(HttpHeaders.Authorization, "Bearer $signInTokenStaff")
+                    }
+                    if (response.status != HttpStatusCode.OK
+                        || response.bodyAsText() != "Hello, ${currentCredentialsStaff.userType} ${currentCredentialsStaff.email}") {
+                        result = CheckResult.wrong(
+                            "testdata.Token validation with signin token failed.\nStatus code should be \"200 OK\"\n" +
+                                    "Message should be \"Hello, ${currentCredentialsStaff.userType} ${currentCredentialsStaff.email}\"")
+                        return@testApplication
+                    }
                 }
             } catch (e: Exception) {
-                return CheckResult.wrong(e.message)
+                result = CheckResult.wrong(e.message)
             }
-            return CheckResult.correct()
+            return result
         }
 
         @DynamicTest(order = 3)
         fun createUser(): CheckResult {
+            var result = CheckResult.correct()
             try {
-                withApplication(createTestEnvironment {
-                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
-                }) {
-                    with(handleRequest(HttpMethod.Put, "/me") {
+                testApplication {
+                    val response = client.put("/me") {
                         setBody(Json.encodeToString(currentUserClient))
-                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenClient")
-                    }) {
-                        if (response.status() != HttpStatusCode.OK)
-                            return@withApplication CheckResult.wrong("Cannot add user by put method")
+                        header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                        header(HttpHeaders.Authorization, "Bearer $signInTokenClient")
                     }
-                    return@withApplication CheckResult.correct()
+                    if (response.status != HttpStatusCode.OK)
+                        result = CheckResult.wrong("Cannot add user by put method")
                 }
             } catch (e: Exception) {
-                return CheckResult.wrong(e.message)
+                result = CheckResult.wrong(e.message)
             }
-            return CheckResult.correct()
+            return result
         }
 
         @DynamicTest(order = 4)
         fun successAdditionMeal(): CheckResult {
+            var result = CheckResult.correct()
             try {
-                withApplication(createTestEnvironment {
-                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
-                }) {
+                testApplication {
+                    lateinit var response: HttpResponse
                     for (meal in currentMeals)
-                        with(handleRequest(HttpMethod.Post, "/meals") {
+                        response = client.post("/meals") {
                             setBody(Json.encodeToString(meal))
-                            addHeader(HttpHeaders.Authorization, "Bearer $signInTokenStaff")
-                            addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                        }) {
-                            if (response.status() != HttpStatusCode.OK)
-                                return@withApplication CheckResult.wrong("The meal was not added. Wrong status code.")
+                            header(HttpHeaders.Authorization, "Bearer $signInTokenStaff")
+                            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                         }
-                    return@withApplication CheckResult.correct()
+                            if (response.status != HttpStatusCode.OK) {
+                                result = CheckResult.wrong("The meal was not added. Wrong status code.")
+                                return@testApplication
+                            }
                 }
             } catch (e: Exception) {
-                return CheckResult.wrong(e.message)
+                result = CheckResult.wrong(e.message)
             }
-            return CheckResult.correct()
+            return result
         }
 
         @DynamicTest(order = 5)
         fun invalidOrderCreation(): CheckResult {
+            var result = CheckResult.correct()
             try {
-                withApplication(createTestEnvironment {
-                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
-                }) {
-                    with(handleRequest(HttpMethod.Post, "/order") {
+                testApplication {
+                    val response = client.post("/order") {
                         setBody(Json.encodeToString(listOf(1, 2, (-9999999..-9999).random())))
-                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenClient")
-                    }) {
-                        if (response.status() != HttpStatusCode.BadRequest)
-                            return@withApplication CheckResult.wrong("Created an order with the wrong meal id. Wrong status code.")
+                        header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                        header(HttpHeaders.Authorization, "Bearer $signInTokenClient")
                     }
-                    return@withApplication CheckResult.correct()
+                    if (response.status != HttpStatusCode.BadRequest)
+                        result = CheckResult.wrong("Created an order with the wrong meal id. Wrong status code.")
                 }
             } catch (e: Exception) {
-                return CheckResult.wrong(e.message)
+                result = CheckResult.wrong(e.message)
             }
-            return CheckResult.correct()
+            return result
         }
 
         @DynamicTest(order = 6)
         fun validOrderCreation(): CheckResult {
+            var result = CheckResult.correct()
             try {
-                withApplication(createTestEnvironment {
-                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
-                }) {
-                    with(handleRequest(HttpMethod.Post, "/order") {
+                testApplication {
+                    val response = client.post( "/order") {
                         setBody(Json.encodeToString(mealsIds))
-                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenClient")
-                    }) {
-                        if (response.status() != HttpStatusCode.OK)
-                            return@withApplication CheckResult.wrong("Unable to create order. Wrong status code.")
-                        val order = Json.decodeFromString<Order>(response.content ?: "")
-                        if (order.userEmail != currentOrder.userEmail || order.price != currentOrder.price || order.address != currentOrder.address || order.status != currentOrder.status)
-                            return@withApplication CheckResult.wrong("Wrong order.")
-                        else currentOrder.orderId = order.orderId
+                        header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                        header(HttpHeaders.Authorization, "Bearer $signInTokenClient")
                     }
-                    return@withApplication CheckResult.correct()
+                    if (response.status != HttpStatusCode.OK) {
+                        result = CheckResult.wrong("Unable to create order. Wrong status code.")
+                        return@testApplication
+                    }
+                    val order = Json.decodeFromString<Order>(response.bodyAsText() ?: "")
+                    if (order.userEmail != currentOrder.userEmail || order.price != currentOrder.price || order.address != currentOrder.address || order.status != currentOrder.status) {
+                        result = CheckResult.wrong("Wrong order.")
+                        return@testApplication
+                    }
+                    else currentOrder.orderId = order.orderId
                 }
             } catch (e: Exception) {
-                return CheckResult.wrong(e.message)
+                result = CheckResult.wrong(e.message)
             }
-            return CheckResult.correct()
+            return result
         }
 
         @DynamicTest(order = 7)
         fun invalidMarkAsReady(): CheckResult {
+            var result = CheckResult.correct()
             try {
-                withApplication(createTestEnvironment {
-                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
-                }) {
-                    with(handleRequest(HttpMethod.Post, "/order/${currentOrder.orderId}/markReady") {
+                testApplication {
+                    val response = client.post("/order/${currentOrder.orderId}/markReady") {
                         setBody(Json.encodeToString(mealsIds))
-                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenClient")
-                    }) {
-                        if (response.status() != HttpStatusCode.Forbidden || response.content != accessDenied)
-                            return@withApplication CheckResult.wrong("Only staff can mark order as COMPLETE. Wrong status code.")
+                        header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                        header(HttpHeaders.Authorization, "Bearer $signInTokenClient")
                     }
-                    return@withApplication CheckResult.correct()
+                    if (response.status != HttpStatusCode.Forbidden || response.bodyAsText() != accessDenied)
+                        result = CheckResult.wrong("Only staff can mark order as COMPLETE. Wrong status code.")
                 }
             } catch (e: Exception) {
-                return CheckResult.wrong(e.message)
+                result = CheckResult.wrong(e.message)
             }
-            return CheckResult.correct()
+            return result
         }
 
         @DynamicTest(order = 8)
         fun validMarkAsReady(): CheckResult {
+            var result = CheckResult.correct()
             try {
-                withApplication(createTestEnvironment {
-                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
-                }) {
-                    with(handleRequest(HttpMethod.Post, "/order/${currentOrder.orderId}/markReady") {
+                testApplication {
+                    val response = client.post("/order/${currentOrder.orderId}/markReady") {
                         setBody(Json.encodeToString(mealsIds))
-                        addHeader(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenStaff")
-                    }) {
-                        if (response.status() != HttpStatusCode.OK)
-                            return@withApplication CheckResult.wrong("Unable to mark order as COMPLETE. Wrong status code.")
+                        header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                        header(HttpHeaders.Authorization, "Bearer $signInTokenStaff")
                     }
-                    return@withApplication CheckResult.correct()
+                    if (response.status != HttpStatusCode.OK)
+                        result = CheckResult.wrong("Unable to mark order as COMPLETE. Wrong status code.")
                 }
             } catch (e: Exception) {
-                return CheckResult.wrong(e.message)
+                result = CheckResult.wrong(e.message)
             }
-            return CheckResult.correct()
+            return result
         }
 
         @DynamicTest(order = 9)
         fun getOrders(): CheckResult {
+            var result = CheckResult.correct()
             try {
-                withApplication(createTestEnvironment {
-                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
-                }) {
-                    with(handleRequest(HttpMethod.Get, "/orderHistory") {
-                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenClient")
-                    }) {
-                        val orders: List<Order> = Json.decodeFromString(response.content ?: "")
-                        var flag = true
-                        for (order in orders) {
-                            if (order.status == "COOK") incompleteSize++
-                            if (order.orderId == currentOrder.orderId) flag = false
-                        }
-                        if (flag)
-                            return@withApplication CheckResult.wrong("Wrong orders list. The newly added order is missing.")
-                        if (response.status() != HttpStatusCode.OK)
-                            return@withApplication CheckResult.wrong("Wrong status code in /orderHistory")
+                testApplication {
+                    val response = client.get("/orderHistory") {
+                        header(HttpHeaders.Authorization, "Bearer $signInTokenClient")
                     }
-                    return@withApplication CheckResult.correct()
+                    val orders: List<Order> = Json.decodeFromString(response.bodyAsText() ?: "")
+                    var flag = true
+                    for (order in orders) {
+                        if (order.status == "COOK") incompleteSize++
+                        if (order.orderId == currentOrder.orderId) flag = false
+                    }
+                    if (flag) {
+                        result = CheckResult.wrong("Wrong orders list. The newly added order is missing.")
+                        return@testApplication
+                    }
+                    if (response.status != HttpStatusCode.OK)
+                        result = CheckResult.wrong("Wrong status code in /orderHistory")
                 }
             } catch (e: Exception) {
-                return CheckResult.wrong(e.message)
+                result = CheckResult.wrong(e.message)
             }
-            return CheckResult.correct()
+            return result
         }
 
         @DynamicTest(order = 10)
         fun getIncompleteOrders(): CheckResult {
+            var result = CheckResult.correct()
             try {
-                withApplication(createTestEnvironment {
-                    config = HoconApplicationConfig(ConfigFactory.load("application.conf"))
-                }) {
-                    with(handleRequest(HttpMethod.Get, "/orderIncomplete") {
-                        addHeader(HttpHeaders.Authorization, "Bearer $signInTokenClient")
-                    }) {
-                        val orders: List<Order> = Json.decodeFromString(response.content ?: "")
-                        for (order in orders)
-                            if (order.status != "COOK") return@withApplication CheckResult.wrong("One of the orders is COMPLETE.")
-                        if (orders.size != incompleteSize) return@withApplication CheckResult.wrong("Invalid size of Incomplete orders.")
-                        if (response.status() != HttpStatusCode.OK)
-                            return@withApplication CheckResult.wrong("Wrong status code in /orderHistory")
+                testApplication {
+                    val response = client.get("/orderIncomplete") {
+                        header(HttpHeaders.Authorization, "Bearer $signInTokenClient")
                     }
-                    return@withApplication CheckResult.correct()
+                    val orders: List<Order> = Json.decodeFromString(response.bodyAsText() ?: "")
+                    for (order in orders)
+                        if (order.status != "COOK") {
+                            result = CheckResult.wrong("One of the orders is COMPLETE.")
+                            return@testApplication
+                        }
+                    if (orders.size != incompleteSize) {
+                        result = CheckResult.wrong("Invalid size of Incomplete orders.")
+                        return@testApplication
+                    }
+                    if (response.status != HttpStatusCode.OK)
+                        result = CheckResult.wrong("Wrong status code in /orderHistory")
                 }
             } catch (e: Exception) {
-                return CheckResult.wrong(e.message)
+                result = CheckResult.wrong(e.message)
             }
-            return CheckResult.correct()
+            return result
         }
 
     }

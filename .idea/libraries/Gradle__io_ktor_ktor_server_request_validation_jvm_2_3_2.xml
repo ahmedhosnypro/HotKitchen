@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="Gradle: io.ktor:ktor-server-request-validation-jvm:2.3.2" type="java-imported" external-system-id="GRADLE">
+    <properties groupId="io.ktor" artifactId="ktor-server-request-validation-jvm" version="2.3.2" />
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-server-request-validation-jvm/2.3.2/d28cf9cbbfd8ee30bb907648a1b06daa1e927e87/ktor-server-request-validation-jvm-2.3.2.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-server-request-validation-jvm/2.3.2/de2fae2659aec5364e7511100e29fbb6b99196bd/ktor-server-request-validation-jvm-2.3.2-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

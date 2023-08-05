@@ -1,5 +1,4 @@
 <div class="step-text">
-<h5 id="profile-management">Profile management</h5>
 <h5 id="description">Description</h5>
 <p>Now you can confidently say that you are done with authorization. You can get the user's email and the user type. However, this is not enough. For the correct functioning of HotKitchen, you need to create a full-fledged user profile. Let's get to it!</p>
 <p>In this stage, you must implement the user profile logic by receiving, adding, updating, and deleting the user information.</p>
@@ -49,7 +48,7 @@
 <p><em>Response code: </em><code class="language-json">200 OK</code><br/>
 <br/>
 Otherwise:</p>
-<p><em>Response code: </em><code class="language-json">400 Bad Request </code></p>
+<p><em>Response code: </em><code class="language-json">404 Not Found</code></p>
 <p></p><div class="alert alert-primary">Use Bearer authorization to access each method. After all, only a user with a token can be identified.</div>
 <h5 id="examples">Examples</h5>
 <p><strong>Example 1: </strong><em><code class="language-json">GET</code> request for <code class="language-json">/me</code> without a token</em></p>
@@ -136,6 +135,6 @@ Otherwise:</p>
 <em>Response code: </em><code class="language-json">200 OK </code><br/>
 </li>
 <li><em>One more <code class="language-json">DELETE</code> request for <code class="language-json">/me</code> with the same token<br/>
-	Response code: </em><code class="language-json">400 Bad Request</code></li>
+	Response code: </em><code class="language-json">404 Not Found</code></li>
 </ol>
 </div>

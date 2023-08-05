@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="Gradle: io.ktor:ktor-server-status-pages-jvm:2.3.2" type="java-imported" external-system-id="GRADLE">
+    <properties groupId="io.ktor" artifactId="ktor-server-status-pages-jvm" version="2.3.2" />
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-server-status-pages-jvm/2.3.2/c3cef08d6500503f788b814b8ac406d85a2853d3/ktor-server-status-pages-jvm-2.3.2.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-server-status-pages-jvm/2.3.2/34230656a68ccbf27a2b6d00d2ef40db182e0af4/ktor-server-status-pages-jvm-2.3.2-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

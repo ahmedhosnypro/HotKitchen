@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="Gradle: io.ktor:ktor-server-html-builder-jvm:2.3.2" type="java-imported" external-system-id="GRADLE">
+    <properties groupId="io.ktor" artifactId="ktor-server-html-builder-jvm" version="2.3.2" />
+    <CLASSES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-server-html-builder-jvm/2.3.2/e488713781f6f59fcd59cb4ff763ec0bd5783e11/ktor-server-html-builder-jvm-2.3.2.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.ktor/ktor-server-html-builder-jvm/2.3.2/14da4716d69c7bf72c5722309e571ffec01a8999/ktor-server-html-builder-jvm-2.3.2-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

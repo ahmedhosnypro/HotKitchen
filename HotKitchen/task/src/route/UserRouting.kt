@@ -1,16 +1,29 @@
 package hotkitchen.route
 
+import com.auth0.jwt.JWT
+import com.auth0.jwt.algorithms.Algorithm
 import entity.User
-import io.ktor.application.*
+import hotkitchen.config.audience
+import hotkitchen.config.issuer
+import hotkitchen.config.secret
 import io.ktor.http.*
-import io.ktor.request.*
-import io.ktor.response.*
-import io.ktor.routing.*
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.auth.jwt.*
+import io.ktor.server.request.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.jetbrains.exposed.sql.*
-import org.jetbrains.exposed.sql.transactions.transaction
+import java.util.*
+
+const val INVALID_PASSWORD = "Invalid password"
+const val INVALID_EMAIL = "Invalid email"
+const val INVALID_EMAIL_PASSWORD = "Invalid email or password"
+const val EMAIL_REGEX = "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+
+const val PASSWORD_REGEX = "^(?=.+[A-Za-z])(?=.+\\d)[A-Za-z\\d]{6,}\$"
 
 @Serializable
 data class UserDTO(
@@ -19,51 +32,57 @@ data class UserDTO(
 
 @Serializable
 data class NewUserDTO(
-    val email: String,
-    val userType: String,
-    val password: String,
+    val email: String, val userType: String, val password: String
 )
 
+
 fun Application.userRouting() {
-    Database.connect("jdbc:postgresql://localhost:5332/HotKitchen", "org.postgresql.Driver", "postgres", "postgres")
-    transaction {
-        addLogger(StdOutSqlLogger)
-        SchemaUtils.create(User)
-    }
     routing {
         post("/signup") {
-            val user = Json.decodeFromString(NewUserDTO.serializer(), call.receiveText())
-
-            try {
-                transaction {
-                    User.insert {
-                        it[email] = user.email
-                        it[userType] = user.userType
-                        it[password] = user.password
-                    }
-                }
-                call.respondText { Json.encodeToString(mapOf("status" to "Signed Up")) }
-            } catch (e: Exception) {
+            val newUser = call.receive<NewUserDTO>()
+            if (newUser.email.matches(Regex(EMAIL_REGEX)).not()) {
                 call.respondText(status = HttpStatusCode.Forbidden) {
-                    Json.encodeToString(mapOf("status" to "Registration failed"))
+                    Json.encodeToString(mapOf("status" to INVALID_EMAIL))
                 }
+                return@post
             }
+            if (newUser.password.matches(Regex(PASSWORD_REGEX)).not()) {
+                call.respondText(status = HttpStatusCode.Forbidden) {
+                    Json.encodeToString(mapOf("status" to INVALID_PASSWORD))
+                }
+                return@post
+            }
+
+            val token = createToken(newUser.email)
+            User.insert(newUser, token)
+            call.respondText { Json.encodeToString(mapOf("token" to token)) }
         }
 
         post("/signin") {
-            val userDTO = Json.decodeFromString(UserDTO.serializer(), call.receiveText())
-            try {
-                transaction {
-                    User.select {
-                        (User.email eq userDTO.email) and (User.password eq userDTO.password)
-                    }.firstOrNull() ?: throw Exception("Authorization failed")
-                }
-                call.respondText { Json.encodeToString(mapOf("status" to "Signed In")) }
-            } catch (e: Exception) {
+            val user = call.receive<UserDTO>()
+            if (user.email.matches(Regex(EMAIL_REGEX)).not() || user.password.matches(Regex(PASSWORD_REGEX)).not()) {
                 call.respondText(status = HttpStatusCode.Forbidden) {
-                    Json.encodeToString(mapOf("status" to e.message))
+                    Json.encodeToString(mapOf("status" to INVALID_EMAIL_PASSWORD))
                 }
+                return@post
+            }
+
+            val token = createToken(user.email)
+            User.signin(user, token)
+            call.respondText { Json.encodeToString(mapOf("token" to token)) }
+        }
+
+        authenticate("auth-jwt") {
+            get("/validate") {
+                val principal = call.principal<JWTPrincipal>()
+                val email = principal!!.payload.getClaim("username").asString()
+                val userType = User.findByEmail(email)!![User.userType]
+                call.respondText { "Hello, $userType $email" }
             }
         }
     }
 }
+
+fun createToken(username: String): String =
+    JWT.create().withAudience(audience).withIssuer(issuer).withClaim("username", username)
+        .withExpiresAt(Date(System.currentTimeMillis() + 60000000)).sign(Algorithm.HMAC256(secret))
